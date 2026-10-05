@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# 1. IMPORTAMOS TU ARCHIVO DE INTELIGENCIA ARTIFICIAL
+from algoritmo import motor_evolutivo
+
 app = FastAPI(title="API Optimizador de Horarios TSU")
 
-# Permisos para que el Frontend se pueda comunicar con este Backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -12,17 +14,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Endpoint de prueba para saber si el servidor está vivo
 @app.get("/")
 def estado_servidor():
     return {"estatus": "En línea", "mensaje": "API del Optimizador lista"}
 
-# Endpoint principal que conectaremos con el motor evolutivo
+# 2. CONECTAMOS EL ENDPOINT CON EL MOTOR
+# Al pedir "datos_front: dict", FastAPI automáticamente lee el JSON que manda la web
 @app.post("/api/generar-horario")
-def arrancar_simulacion():
-    # Aquí vamos a importar el motor_evolutivo después
-    return {
-        "mensaje": "Endpoint listo para recibir datos del front y pasarlos a la IA",
-        "fitness_final": 0,
-        "horario": []
-    }
+def arrancar_simulacion(datos_front: dict):
+    
+    # Le inyectamos los datos dinámicos a tu algoritmo y esperamos a que termine
+    resultado_ia = motor_evolutivo.ejecutar_optimizador(datos_front)
+    
+    # Devolvemos el diccionario con el fitness final y el horario ganador a las pantallas
+    return resultado_ia
