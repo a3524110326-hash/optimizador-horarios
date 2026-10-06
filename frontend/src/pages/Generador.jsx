@@ -1,53 +1,90 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Play, Loader2, AlertCircle } from 'lucide-react';
+import { obtenerCatalogo, generarHorario, guardarResultado, mensajeDeError } from '../api';
 
 export default function Generador() {
-  const [procesando, setProcesando] = useState(false);
   const navigate = useNavigate();
+  const [catalogo, setCatalogo] = useState(null);
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState('');
 
-  const ejecutarIA = () => {
-    setProcesando(true);
-    // Simulación de llamada a tu API Python
-    setTimeout(() => {
-      setProcesando(false);
+  // Al abrir la pantalla, leemos el catálogo real desde Supabase (vía backend)
+  useEffect(() => {
+    obtenerCatalogo()
+      .then(setCatalogo)
+      .catch((e) => setError(mensajeDeError(e)));
+  }, []);
+
+  const incompleto =
+    catalogo &&
+    (!catalogo.grupos.length ||
+      !catalogo.aulas_teoricas.length ||
+      !catalogo.laboratorios.length ||
+      !Object.keys(catalogo.materias).length);
+
+  async function iniciar() {
+    setCargando(true);
+    setError('');
+    try {
+      const resultado = await generarHorario();
+      guardarResultado(catalogo, resultado);
       navigate('/resultados');
-    }, 3000);
-  };
+    } catch (e) {
+      setError(mensajeDeError(e));
+    } finally {
+      setCargando(false);
+    }
+  }
 
   return (
-    <div className="flex h-full items-center justify-center p-8">
-      <div className="max-w-2xl w-full bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="bg-slate-800 p-8 text-center">
-          <h1 className="text-3xl font-bold text-white mb-2">Motor de Optimización DEAP</h1>
-          <p className="text-slate-300">Resolución de Empalmes Evolutiva</p>
+    <div className="flex items-center justify-center min-h-[80vh] p-8">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
+        <div className="bg-slate-800 text-center px-6 py-8">
+          <h1 className="text-3xl font-bold text-white">Motor de Optimización DEAP</h1>
+          <p className="text-slate-300 mt-2">Resolución de empalmes evolutiva</p>
         </div>
 
-        <div className="p-8 text-center">
-          <div className="flex justify-center gap-8 mb-8">
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 min-w-[150px]">
-              <p className="text-3xl font-bold text-blue-900">8</p>
-              <p className="text-sm text-blue-700 font-medium">Grupos TSU</p>
+        <div className="p-8">
+          <div className="flex justify-center gap-4 mb-8">
+            <div className="bg-blue-50 border border-blue-100 rounded-xl px-6 py-4 text-center">
+              <p className="text-3xl font-bold text-blue-900">{catalogo ? catalogo.grupos.length : '—'}</p>
+              <p className="text-sm font-medium text-blue-700">Grupos TSU</p>
             </div>
-            <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 min-w-[150px]">
-              <p className="text-3xl font-bold text-emerald-900">4 / 2</p>
-              <p className="text-sm text-emerald-700 font-medium">Aulas / Labs</p>
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-6 py-4 text-center">
+              <p className="text-3xl font-bold text-emerald-900">
+                {catalogo ? `${catalogo.aulas_teoricas.length} / ${catalogo.laboratorios.length}` : '— / —'}
+              </p>
+              <p className="text-sm font-medium text-emerald-700">Aulas / Laboratorios</p>
             </div>
           </div>
 
-          {!procesando ? (
-            <button 
-              onClick={ejecutarIA}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold py-4 rounded-xl shadow-md transition-all"
-            >
-              ▶ Iniciar Optimización
-            </button>
-          ) : (
-            <div className="bg-gray-50 border border-gray-200 p-6 rounded-xl flex flex-col items-center">
-              <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-4" />
-              <p className="font-bold text-gray-800">Evaluando generaciones...</p>
-              <p className="text-sm text-gray-500 mt-1">Calculando cruzas y mutaciones para reducir empalmes a cero.</p>
-            </div>
+          <button
+            onClick={iniciar}
+            disabled={cargando || !catalogo || incompleto}
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-lg font-semibold py-4 rounded-xl transition-colors"
+          >
+            {cargando ? (
+              <>
+                <Loader2 size={22} className="animate-spin" /> Optimizando… puede tardar un par de minutos
+              </>
+            ) : (
+              <>
+                <Play size={22} /> Iniciar optimización
+              </>
+            )}
+          </button>
+
+          {incompleto && (
+            <p className="mt-4 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3">
+              Falta información en la base de datos (grupos, materias o espacios). Revísala en Supabase.
+            </p>
+          )}
+
+          {error && (
+            <p className="mt-4 flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg p-3">
+              <AlertCircle size={18} className="shrink-0 mt-0.5" /> {error}
+            </p>
           )}
         </div>
       </div>

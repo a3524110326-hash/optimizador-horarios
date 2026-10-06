@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from supabase_client import supabase
@@ -50,21 +50,40 @@ def obtener_datos_bd():
     # ------------------------------------------
 
     materias_result = supabase.table("materias").select(
-        "id, clave, nombre, horas_semana, requiere_laboratorio"
+        "id, clave, nombre, horas_semana, "
+        "requiere_laboratorio, cuatrimestre_id"
     ).execute()
 
 
     # ------------------------------------------
-    # 2. PROFESORES
+    # 2. CUATRIMESTRES
     # ------------------------------------------
 
-    profesores_result = supabase.table("profesores").select(
+    cuatrimestres_result = supabase.table(
+        "cuatrimestres"
+    ).select(
+        "id, numero"
+    ).execute()
+
+    numero_por_cuatrimestre = {
+        str(c["id"]): c["numero"]
+        for c in cuatrimestres_result.data
+    }
+
+
+    # ------------------------------------------
+    # 3. PROFESORES
+    # ------------------------------------------
+
+    profesores_result = supabase.table(
+        "profesores"
+    ).select(
         "id, nombre_completo"
     ).execute()
 
 
     # ------------------------------------------
-    # 3. RELACIÓN PROFESOR - MATERIA
+    # 4. RELACIÓN PROFESOR - MATERIA
     # ------------------------------------------
 
     profesor_materia_result = supabase.table(
@@ -75,25 +94,35 @@ def obtener_datos_bd():
 
 
     # ------------------------------------------
-    # 4. GRUPOS
+    # 5. GRUPOS
     # ------------------------------------------
 
-    grupos_result = supabase.table("grupos").select(
+    grupos_result = supabase.table(
+        "grupos"
+    ).select(
         "nombre"
+    ).eq(
+        "activo",
+        True
     ).execute()
 
 
     # ------------------------------------------
-    # 5. ESPACIOS
+    # 6. ESPACIOS
     # ------------------------------------------
 
-    espacios_result = supabase.table("espacios").select(
+    espacios_result = supabase.table(
+        "espacios"
+    ).select(
         "nombre, tipo, capacidad"
+    ).eq(
+        "activo",
+        True
     ).execute()
 
 
     # ------------------------------------------
-    # 6. BLOQUES DE HORARIO
+    # 7. BLOQUES DE HORARIO
     # ------------------------------------------
 
     bloques_result = supabase.table(
@@ -189,11 +218,17 @@ def obtener_datos_bd():
             materia["id"]
         )
 
+        cuatrimestre = numero_por_cuatrimestre.get(
+            str(materia["cuatrimestre_id"])
+        )
+
         datos["materias"][
             materia["clave"]
         ] = {
 
             "nombre": materia["nombre"],
+
+            "cuatrimestre": cuatrimestre,
 
             "horas": materia["horas_semana"],
 
@@ -264,6 +299,397 @@ def obtener_datos_bd():
 def datos_supabase():
 
     return obtener_datos_bd()
+
+
+# ==========================================
+# OPCIONES PARA LOS FORMULARIOS
+# ==========================================
+
+@app.get("/api/opciones-catalogo")
+def opciones_catalogo():
+
+    carreras = supabase.table(
+        "carreras"
+    ).select(
+        "id, nombre, clave"
+    ).eq(
+        "activo",
+        True
+    ).execute()
+
+    cuatrimestres = supabase.table(
+        "cuatrimestres"
+    ).select(
+        "id, numero, nombre, carrera_id"
+    ).execute()
+
+    periodos = supabase.table(
+        "periodos_academicos"
+    ).select(
+        "id, nombre, fecha_inicio, fecha_fin"
+    ).eq(
+        "activo",
+        True
+    ).execute()
+
+    profesores = supabase.table(
+        "profesores"
+    ).select(
+        "id, nombre_completo, correo"
+    ).eq(
+        "activo",
+        True
+    ).execute()
+
+    return {
+        "carreras": carreras.data,
+        "cuatrimestres": cuatrimestres.data,
+        "periodos": periodos.data,
+        "profesores": profesores.data
+    }
+
+
+# ==========================================
+# CREAR PROFESOR
+# ==========================================
+
+@app.post("/api/profesores")
+def crear_profesor(datos: dict):
+
+    nombre = datos.get(
+        "nombre_completo",
+        ""
+    ).strip()
+
+    correo = datos.get(
+        "correo",
+        ""
+    ).strip()
+
+    if not nombre:
+        raise HTTPException(
+            status_code=400,
+            detail="El nombre del profesor es obligatorio."
+        )
+
+    try:
+
+        resultado = supabase.table(
+            "profesores"
+        ).insert({
+            "nombre_completo": nombre,
+            "correo": correo or None,
+            "activo": True
+        }).execute()
+
+        return resultado.data[0]
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo crear el profesor: {str(e)}"
+        )
+
+
+# ==========================================
+# CREAR MATERIA
+# ==========================================
+
+@app.post("/api/materias")
+def crear_materia(datos: dict):
+
+    clave = datos.get(
+        "clave",
+        ""
+    ).strip()
+
+    nombre = datos.get(
+        "nombre",
+        ""
+    ).strip()
+
+    horas = datos.get(
+        "horas_semana"
+    )
+
+    requiere_laboratorio = datos.get(
+        "requiere_laboratorio",
+        False
+    )
+
+    carrera_id = datos.get(
+        "carrera_id"
+    )
+
+    cuatrimestre_id = datos.get(
+        "cuatrimestre_id"
+    )
+
+    profesor_id = datos.get(
+        "profesor_id"
+    )
+
+
+    if not clave:
+
+        raise HTTPException(
+            status_code=400,
+            detail="La clave de la materia es obligatoria."
+        )
+
+
+    if not nombre:
+
+        raise HTTPException(
+            status_code=400,
+            detail="El nombre de la materia es obligatorio."
+        )
+
+
+    if horas is None:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Las horas por semana son obligatorias."
+        )
+
+
+    if not carrera_id:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Selecciona una carrera."
+        )
+
+
+    if not cuatrimestre_id:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Selecciona un cuatrimestre."
+        )
+
+
+    try:
+
+        materia_result = supabase.table(
+            "materias"
+        ).insert({
+
+            "clave": clave,
+
+            "nombre": nombre,
+
+            "horas_semana": int(horas),
+
+            "requiere_laboratorio": bool(
+                requiere_laboratorio
+            ),
+
+            "carrera_id": carrera_id,
+
+            "cuatrimestre_id": cuatrimestre_id,
+
+            "activo": True
+
+        }).execute()
+
+
+        materia_creada = materia_result.data[0]
+
+
+        # --------------------------------------
+        # RELACIONAR PROFESOR
+        # --------------------------------------
+
+        if profesor_id:
+
+            supabase.table(
+                "profesor_materia"
+            ).insert({
+
+                "profesor_id": profesor_id,
+
+                "materia_id": materia_creada["id"]
+
+            }).execute()
+
+
+        return materia_creada
+
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo crear la materia: {str(e)}"
+        )
+
+
+# ==========================================
+# CREAR GRUPO
+# ==========================================
+
+@app.post("/api/grupos")
+def crear_grupo(datos: dict):
+
+    nombre = datos.get(
+        "nombre",
+        ""
+    ).strip()
+
+    cuatrimestre_id = datos.get(
+        "cuatrimestre_id"
+    )
+
+    periodo_id = datos.get(
+        "periodo_id"
+    )
+
+    turno = datos.get(
+        "turno",
+        ""
+    ).strip()
+
+
+    if not nombre:
+
+        raise HTTPException(
+            status_code=400,
+            detail="El nombre del grupo es obligatorio."
+        )
+
+
+    if not cuatrimestre_id:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Selecciona un cuatrimestre."
+        )
+
+
+    if not periodo_id:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Selecciona un periodo académico."
+        )
+
+
+    if not turno:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Selecciona un turno."
+        )
+
+
+    try:
+
+        resultado = supabase.table(
+            "grupos"
+        ).insert({
+
+            "nombre": nombre,
+
+            "cuatrimestre_id": cuatrimestre_id,
+
+            "periodo_id": periodo_id,
+
+            "turno": turno,
+
+            "activo": True
+
+        }).execute()
+
+
+        return resultado.data[0]
+
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo crear el grupo: {str(e)}"
+        )
+
+
+# ==========================================
+# CREAR ESPACIO
+# ==========================================
+
+@app.post("/api/espacios")
+def crear_espacio(datos: dict):
+
+    nombre = datos.get(
+        "nombre",
+        ""
+    ).strip()
+
+    tipo = datos.get(
+        "tipo",
+        ""
+    ).strip().upper()
+
+    capacidad = datos.get(
+        "capacidad"
+    )
+
+
+    if not nombre:
+
+        raise HTTPException(
+            status_code=400,
+            detail="El nombre del espacio es obligatorio."
+        )
+
+
+    if tipo not in [
+        "AULA",
+        "LABORATORIO"
+    ]:
+
+        raise HTTPException(
+            status_code=400,
+            detail="El tipo debe ser AULA o LABORATORIO."
+        )
+
+
+    if capacidad is None:
+
+        raise HTTPException(
+            status_code=400,
+            detail="La capacidad es obligatoria."
+        )
+
+
+    try:
+
+        resultado = supabase.table(
+            "espacios"
+        ).insert({
+
+            "nombre": nombre,
+
+            "tipo": tipo,
+
+            "capacidad": int(capacidad),
+
+            "activo": True
+
+        }).execute()
+
+
+        return resultado.data[0]
+
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo crear el espacio: {str(e)}"
+        )
 
 
 # ==========================================
