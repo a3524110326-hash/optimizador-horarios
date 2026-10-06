@@ -1,4 +1,4 @@
-# Optimizador de Horarios - TSU Desarrollo de Software
+# Optimizador de Horarios -  Desarrollo de Software
 
 Sistema diseñado para la Universidad Tecnológica de Tehuacán que automatiza la generación de horarios escolares utilizando algoritmos evolutivos. El sistema busca la distribución óptima de clases respetando las restricciones de profesores, aulas, materias y bloques de tiempo.
 
