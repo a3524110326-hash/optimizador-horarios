@@ -9,3 +9,4 @@ backend/__pycache__/
 
 # Variables de entorno
 .env
+backend/.env
