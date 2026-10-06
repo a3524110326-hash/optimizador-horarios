@@ -9,6 +9,7 @@ backend/__pycache__/
 
 # Variables de entorno
 .env
+backend/.env
 
 # Entorno virtual de Python
 .venv/
