@@ -15,6 +15,7 @@ if not hasattr(creator, "FitnessMin"):
         weights=(-1.0,)
     )
 
+
 if not hasattr(creator, "Individuo"):
     creator.create(
         "Individuo",
@@ -24,119 +25,291 @@ if not hasattr(creator, "Individuo"):
 
 
 # ============================================================
-# 2. FUNCIÓN PRINCIPAL
+# 2. OBTENER CUATRIMESTRE DEL GRUPO
+# ============================================================
+
+def obtener_cuatrimestre_grupo(grupo):
+
+    """
+    Obtiene el número de cuatrimestre a partir
+    del nombre del grupo.
+
+    Ejemplos:
+
+        1A -> 1
+        1B -> 1
+        1E -> 1
+        4A -> 4
+        4B -> 4
+    """
+
+    if not grupo:
+        return None
+
+    texto = str(grupo).strip()
+
+    digitos = ""
+
+    for caracter in texto:
+
+        if caracter.isdigit():
+
+            digitos += caracter
+
+        else:
+
+            break
+
+    if not digitos:
+
+        return None
+
+    return int(digitos)
+
+
+# ============================================================
+# 3. FUNCIÓN PRINCIPAL
 # ============================================================
 
 def ejecutar_optimizador(datos_front):
+
     """
     Ejecuta el algoritmo evolutivo para generar un horario.
 
     Recibe:
-        datos_front: diccionario con grupos, materias, espacios,
-                     días y bloques de tiempo.
+
+        datos_front:
+            Diccionario con:
+
+            - grupos
+            - materias
+            - laboratorios
+            - aulas_teoricas
+            - dias
+            - bloques_tiempo
 
     Devuelve:
+
         Diccionario JSON con:
-        - mensaje
-        - fitness_final
-        - horario
+
+            - mensaje
+            - fitness_final
+            - parametros
+            - horario
     """
 
-    # ========================================================
-    # 3. OBTENER DATOS
-    # ========================================================
-
-    grupos = datos_front.get("grupos", [])
-    materias = datos_front.get("materias", {})
-    laboratorios = datos_front.get("laboratorios", [])
-    aulas_teoricas = datos_front.get("aulas_teoricas", [])
-    dias = datos_front.get("dias", [])
-    bloques_tiempo = datos_front.get("bloques_tiempo", [])
-
 
     # ========================================================
-    # 4. VALIDACIONES BÁSICAS
+    # 4. OBTENER DATOS
+    # ========================================================
+
+    grupos = datos_front.get(
+        "grupos",
+        []
+    )
+
+    materias = datos_front.get(
+        "materias",
+        {}
+    )
+
+    laboratorios = datos_front.get(
+        "laboratorios",
+        []
+    )
+
+    aulas_teoricas = datos_front.get(
+        "aulas_teoricas",
+        []
+    )
+
+    dias = datos_front.get(
+        "dias",
+        []
+    )
+
+    bloques_tiempo = datos_front.get(
+        "bloques_tiempo",
+        []
+    )
+
+
+    # ========================================================
+    # 5. VALIDACIONES BÁSICAS
     # ========================================================
 
     if not grupos:
-        raise ValueError("No se recibieron grupos.")
+
+        raise ValueError(
+            "No se recibieron grupos."
+        )
+
 
     if not materias:
-        raise ValueError("No se recibieron materias.")
+
+        raise ValueError(
+            "No se recibieron materias."
+        )
+
 
     if not dias:
-        raise ValueError("No se recibieron días.")
+
+        raise ValueError(
+            "No se recibieron días."
+        )
+
 
     if not bloques_tiempo:
-        raise ValueError("No se recibieron bloques de tiempo.")
+
+        raise ValueError(
+            "No se recibieron bloques de tiempo."
+        )
+
 
     if not aulas_teoricas and not laboratorios:
-        raise ValueError("No existen espacios disponibles.")
+
+        raise ValueError(
+            "No existen espacios disponibles."
+        )
 
 
     # ========================================================
-    # 5. IDENTIFICAR MATERIAS POR CUATRIMESTRE
+    # 6. MOSTRAR INFORMACIÓN DE DIAGNÓSTICO
     # ========================================================
 
-    materias_1er = {
-        "FSC",
-        "FUP",
-        "FUR",
-        "FUM",
-        "DHV",
-        "CHD",
-        "IN1"
-    }
+    print("\n")
+    print("==============================================")
+    print("       MOTOR EVOLUTIVO")
+    print("==============================================")
 
-    materias_4 = {
-        "AND",
-        "CÁV",
-        "DEA",
-        "ESD",
-        "APW",
-        "IN4",
-        "ÉTP"
-    }
+    print("Grupos recibidos:")
+
+    for grupo in grupos:
+
+        print(
+            "  ",
+            grupo,
+            "-> cuatrimestre:",
+            obtener_cuatrimestre_grupo(grupo)
+        )
+
+
+    print("\nMaterias recibidas:")
+
+    for codigo, detalles in materias.items():
+
+        print(
+            "  ",
+            codigo,
+            "-> cuatrimestre:",
+            detalles.get("cuatrimestre"),
+            "| horas:",
+            detalles.get("horas"),
+            "| profesor:",
+            detalles.get("profesor")
+        )
+
+
+    print("\n==============================================")
+    print("       ASIGNACIÓN DE MATERIAS")
+    print("==============================================")
 
 
     # ========================================================
-    # 6. CAJA DE HERRAMIENTAS DE DEAP
-    # ========================================================
-
-    toolbox = base.Toolbox()
-
-
-    # ========================================================
-    # 7. GENERADOR DE HORARIO ALEATORIO
+    # 7. FUNCIÓN PARA GENERAR HORARIO ALEATORIO
     # ========================================================
 
     def generar_horario_aleatorio():
 
         horario_completo = []
 
+
+        # ----------------------------------------------------
+        # Recorrer grupos
+        # ----------------------------------------------------
+
         for grupo in grupos:
 
-            # Determinar cuatrimestre por el nombre del grupo.
-            prefijo = grupo[0]
+            cuatrimestre_grupo = (
+                obtener_cuatrimestre_grupo(
+                    grupo
+                )
+            )
 
-            if prefijo == "1":
-                materias_validas = materias_1er
 
-            elif prefijo == "4":
-                materias_validas = materias_4
+            # Si no podemos determinar el cuatrimestre,
+            # no podemos asignarle materias.
 
-            else:
-                # Si aparece un grupo diferente,
-                # no se le asignan materias.
+            if cuatrimestre_grupo is None:
+
+                print(
+                    "⚠️ Grupo ignorado:",
+                    grupo,
+                    "- no se pudo determinar el cuatrimestre."
+                )
+
                 continue
 
 
+            print(
+                "Grupo",
+                grupo,
+                "-> cuatrimestre",
+                cuatrimestre_grupo
+            )
+
+
+            materias_grupo = []
+
+
+            # ------------------------------------------------
+            # Buscar materias del mismo cuatrimestre
+            # ------------------------------------------------
+
             for codigo_materia, detalles in materias.items():
 
-                # Si la materia no corresponde al cuatrimestre,
-                # se ignora.
-                if codigo_materia not in materias_validas:
-                    continue
+                cuatrimestre_materia = detalles.get(
+                    "cuatrimestre"
+                )
+
+
+                if cuatrimestre_materia == cuatrimestre_grupo:
+
+                    materias_grupo.append(
+                        codigo_materia
+                    )
+
+
+            print(
+                "   Materias encontradas:",
+                materias_grupo
+            )
+
+
+            # ------------------------------------------------
+            # Si no tiene materias
+            # ------------------------------------------------
+
+            if not materias_grupo:
+
+                print(
+                    "   ⚠️ No hay materias para el grupo",
+                    grupo
+                )
+
+                continue
+
+
+            # ------------------------------------------------
+            # Crear clases
+            # ------------------------------------------------
+
+            for codigo_materia in materias_grupo:
+
+                detalles = materias.get(
+                    codigo_materia,
+                    {}
+                )
 
 
                 nombre_materia = detalles.get(
@@ -144,13 +317,22 @@ def ejecutar_optimizador(datos_front):
                     codigo_materia
                 )
 
+
                 horas = int(
-                    detalles.get("horas", 0)
+                    detalles.get(
+                        "horas",
+                        0
+                    )
                 )
 
+
                 requiere_lab = bool(
-                    detalles.get("requiere_lab", False)
+                    detalles.get(
+                        "requiere_lab",
+                        False
+                    )
                 )
+
 
                 profesor = detalles.get(
                     "profesor",
@@ -159,21 +341,29 @@ def ejecutar_optimizador(datos_front):
 
 
                 # ------------------------------------------------
-                # Determinar espacios posibles
+                # Determinar espacios
                 # ------------------------------------------------
 
                 if requiere_lab:
 
-                    espacios_disponibles = laboratorios
+                    espacios_disponibles = (
+                        laboratorios
+                    )
 
                 else:
 
-                    espacios_disponibles = aulas_teoricas
+                    espacios_disponibles = (
+                        aulas_teoricas
+                    )
 
 
-                # Si una materia requiere laboratorio pero
-                # no existen laboratorios, usamos una lista vacía.
+                # ------------------------------------------------
+                # Si no existe el espacio requerido,
+                # utilizar cualquier espacio disponible.
+                # ------------------------------------------------
+
                 if not espacios_disponibles:
+
                     espacios_disponibles = (
                         laboratorios
                         if laboratorios
@@ -182,24 +372,56 @@ def ejecutar_optimizador(datos_front):
 
 
                 # ------------------------------------------------
-                # Crear cada hora de la materia
+                # Seguridad adicional
+                # ------------------------------------------------
+
+                if not espacios_disponibles:
+
+                    raise ValueError(
+                        f"No existen espacios disponibles "
+                        f"para la materia {codigo_materia}."
+                    )
+
+
+                # ------------------------------------------------
+                # Crear una clase por cada hora semanal
                 # ------------------------------------------------
 
                 for _ in range(horas):
 
                     gen_clase = {
+
                         "grupo": grupo,
-                        "materia_codigo": codigo_materia,
-                        "materia": nombre_materia,
-                        "profesor": profesor,
-                        "dia": random.choice(dias),
-                        "bloque": random.choice(bloques_tiempo),
+
+                        "materia_codigo": (
+                            codigo_materia
+                        ),
+
+                        "materia": (
+                            nombre_materia
+                        ),
+
+                        "profesor": (
+                            profesor
+                        ),
+
+                        "dia": random.choice(
+                            dias
+                        ),
+
+                        "bloque": random.choice(
+                            bloques_tiempo
+                        ),
+
                         "espacio": random.choice(
                             espacios_disponibles
                         )
                     }
 
-                    horario_completo.append(gen_clase)
+
+                    horario_completo.append(
+                        gen_clase
+                    )
 
 
         return horario_completo
@@ -219,11 +441,11 @@ def ejecutar_optimizador(datos_front):
         # ----------------------------------------------------
 
         registro_espacios = set()
+
         registro_profesores = set()
+
         registro_grupos = set()
 
-        # Evita que una materia del mismo grupo
-        # aparezca dos veces exactamente en el mismo bloque.
         registro_materias_grupo = set()
 
 
@@ -234,10 +456,15 @@ def ejecutar_optimizador(datos_front):
         for gen in individuo:
 
             grupo = gen["grupo"]
+
             profesor = gen["profesor"]
+
             dia = gen["dia"]
+
             bloque = gen["bloque"]
+
             espacio = gen["espacio"]
+
             materia_codigo = gen.get(
                 "materia_codigo",
                 gen["materia"]
@@ -254,9 +481,9 @@ def ejecutar_optimizador(datos_front):
                 bloque
             )
 
+
             if llave_espacio in registro_espacios:
 
-                # Dos grupos en el mismo salón/laboratorio.
                 penalizaciones += 50
 
             else:
@@ -276,17 +503,21 @@ def ejecutar_optimizador(datos_front):
                 bloque
             )
 
-            if llave_profesor in registro_profesores:
 
-                # Un profesor no puede impartir
-                # dos clases simultáneamente.
-                penalizaciones += 100
+            # No penalizamos "Sin profesor" como si fuera
+            # el mismo profesor real.
 
-            else:
+            if profesor != "Sin profesor":
 
-                registro_profesores.add(
-                    llave_profesor
-                )
+                if llave_profesor in registro_profesores:
+
+                    penalizaciones += 100
+
+                else:
+
+                    registro_profesores.add(
+                        llave_profesor
+                    )
 
 
             # =================================================
@@ -299,10 +530,9 @@ def ejecutar_optimizador(datos_front):
                 bloque
             )
 
+
             if llave_grupo in registro_grupos:
 
-                # Un grupo no puede estar en dos materias
-                # simultáneamente.
                 penalizaciones += 100
 
             else:
@@ -323,6 +553,7 @@ def ejecutar_optimizador(datos_front):
                 bloque
             )
 
+
             if llave_materia_grupo in registro_materias_grupo:
 
                 penalizaciones += 75
@@ -335,7 +566,7 @@ def ejecutar_optimizador(datos_front):
 
 
         # ====================================================
-        # 5. PENALIZACIÓN POR MATERIAS EN ESPACIO INCORRECTO
+        # 5. ESPACIOS CORRECTOS
         # ====================================================
 
         for gen in individuo:
@@ -347,10 +578,12 @@ def ejecutar_optimizador(datos_front):
 
             espacio = gen["espacio"]
 
+
             detalles = materias.get(
                 materia_codigo,
                 {}
             )
+
 
             requiere_lab = detalles.get(
                 "requiere_lab",
@@ -360,22 +593,26 @@ def ejecutar_optimizador(datos_front):
 
             if requiere_lab:
 
-                # Materia de laboratorio fuera de laboratorio.
+                # Materia de laboratorio debe estar
+                # en laboratorio.
+
                 if espacio not in laboratorios:
 
                     penalizaciones += 200
 
             else:
 
-                # Materia teórica dentro de un laboratorio.
-                # No es necesariamente imposible, pero para
-                # nuestro modelo queremos aulas teóricas.
+                # Materia teórica debe estar
+                # en aula teórica.
+
                 if espacio not in aulas_teoricas:
 
                     penalizaciones += 200
 
 
-        return (penalizaciones,)
+        return (
+            penalizaciones,
+        )
 
 
     # ========================================================
@@ -385,31 +622,44 @@ def ejecutar_optimizador(datos_front):
     def mutar_horario(individuo):
 
         if not individuo:
-            return (individuo,)
+
+            return (
+                individuo,
+            )
 
 
-        # Elegimos una clase al azar.
+        # ----------------------------------------------------
+        # Elegir una clase
+        # ----------------------------------------------------
+
         indice = random.randrange(
             len(individuo)
         )
 
+
         gen = individuo[indice]
 
 
-        # Cambiar día.
+        # ----------------------------------------------------
+        # Cambiar día
+        # ----------------------------------------------------
+
         gen["dia"] = random.choice(
             dias
         )
 
 
-        # Cambiar bloque.
+        # ----------------------------------------------------
+        # Cambiar bloque
+        # ----------------------------------------------------
+
         gen["bloque"] = random.choice(
             bloques_tiempo
         )
 
 
         # ----------------------------------------------------
-        # También podemos cambiar el espacio.
+        # Cambiar espacio
         # ----------------------------------------------------
 
         materia_codigo = gen.get(
@@ -417,10 +667,12 @@ def ejecutar_optimizador(datos_front):
             ""
         )
 
+
         detalles = materias.get(
             materia_codigo,
             {}
         )
+
 
         requiere_lab = detalles.get(
             "requiere_lab",
@@ -441,28 +693,66 @@ def ejecutar_optimizador(datos_front):
             )
 
 
-        return (individuo,)
+        return (
+            individuo,
+        )
 
 
     # ========================================================
     # 10. CRUZA SEGURA
     # ========================================================
 
-    def cruzar_horarios(individuo1, individuo2):
+    def cruzar_horarios(
+        individuo1,
+        individuo2
+    ):
 
         """
-        Cruza dos horarios utilizando dos puntos.
+        Cruza dos horarios utilizando
+        dos puntos.
 
-        Se realizan copias profundas para evitar que
-        los diccionarios internos queden compartidos
-        entre individuos.
+        Se realizan copias profundas para
+        evitar compartir diccionarios.
         """
 
-        hijo1 = copy.deepcopy(individuo1)
-        hijo2 = copy.deepcopy(individuo2)
+        hijo1 = copy.deepcopy(
+            individuo1
+        )
+
+        hijo2 = copy.deepcopy(
+            individuo2
+        )
 
 
-        if len(hijo1) < 2 or len(hijo2) < 2:
+        # ----------------------------------------------------
+        # Si no hay suficientes elementos,
+        # no realizar cruza.
+        # ----------------------------------------------------
+
+        if (
+            len(hijo1) < 2
+            or
+            len(hijo2) < 2
+        ):
+
+            return (
+                hijo1,
+                hijo2
+            )
+
+
+        # ----------------------------------------------------
+        # Los dos individuos deben tener el mismo tamaño
+        # para realizar la cruza correctamente.
+        # ----------------------------------------------------
+
+        longitud = min(
+            len(hijo1),
+            len(hijo2)
+        )
+
+
+        if longitud < 2:
 
             return (
                 hijo1,
@@ -472,12 +762,13 @@ def ejecutar_optimizador(datos_front):
 
         punto1 = random.randint(
             1,
-            len(hijo1) - 1
+            longitud - 1
         )
+
 
         punto2 = random.randint(
             1,
-            len(hijo1) - 1
+            longitud - 1
         )
 
 
@@ -490,16 +781,24 @@ def ejecutar_optimizador(datos_front):
 
 
         hijo1[punto1:punto2], hijo2[punto1:punto2] = (
+
             hijo2[punto1:punto2],
+
             hijo1[punto1:punto2]
         )
 
 
-        # Invalidar fitness porque los hijos cambiaron.
-        if hasattr(hijo1.fitness, "values"):
+        # ----------------------------------------------------
+        # Invalidar fitness
+        # ----------------------------------------------------
+
+        if hijo1.fitness.valid:
+
             del hijo1.fitness.values
 
-        if hasattr(hijo2.fitness, "values"):
+
+        if hijo2.fitness.valid:
+
             del hijo2.fitness.values
 
 
@@ -512,6 +811,9 @@ def ejecutar_optimizador(datos_front):
     # ========================================================
     # 11. REGISTRO DEL TOOLBOX
     # ========================================================
+
+    toolbox = base.Toolbox()
+
 
     toolbox.register(
         "individuo",
@@ -565,6 +867,7 @@ def ejecutar_optimizador(datos_front):
         )
     )
 
+
     PROB_CRUZA = float(
         datos_front.get(
             "prob_cruza",
@@ -572,12 +875,14 @@ def ejecutar_optimizador(datos_front):
         )
     )
 
+
     PROB_MUTACION = float(
         datos_front.get(
             "prob_mutacion",
             0.20
         )
     )
+
 
     GENERACIONES = int(
         datos_front.get(
@@ -605,19 +910,26 @@ def ejecutar_optimizador(datos_front):
         individuo.fitness.values
     )
 
+
     estadisticas.register(
         "Min",
         min
     )
 
+
     estadisticas.register(
         "Promedio",
         lambda valores:
+
         sum(
             v[0]
             for v in valores
-        ) / len(valores)
+        )
+        /
+        len(valores)
+
         if valores
+
         else 0
     )
 
@@ -626,14 +938,46 @@ def ejecutar_optimizador(datos_front):
     # 15. EJECUTAR ALGORITMO EVOLUTIVO
     # ========================================================
 
-    poblacion_final, registro_log = algorithms.eaSimple(
-        poblacion,
-        toolbox,
-        cxpb=PROB_CRUZA,
-        mutpb=PROB_MUTACION,
-        ngen=GENERACIONES,
-        stats=estadisticas,
-        verbose=False
+    print("\n")
+    print("==============================================")
+    print("       INICIANDO ALGORITMO EVOLUTIVO")
+    print("==============================================")
+
+    print(
+        "Población:",
+        TAMANO_POBLACION
+    )
+
+    print(
+        "Generaciones:",
+        GENERACIONES
+    )
+
+    print(
+        "Probabilidad de cruza:",
+        PROB_CRUZA
+    )
+
+    print(
+        "Probabilidad de mutación:",
+        PROB_MUTACION
+    )
+
+    print(
+        "=============================================="
+    )
+
+
+    poblacion_final, registro_log = (
+        algorithms.eaSimple(
+            poblacion,
+            toolbox,
+            cxpb=PROB_CRUZA,
+            mutpb=PROB_MUTACION,
+            ngen=GENERACIONES,
+            stats=estadisticas,
+            verbose=False
+        )
     )
 
 
@@ -651,7 +995,9 @@ def ejecutar_optimizador(datos_front):
     # 17. CALCULAR FITNESS FINAL
     # ========================================================
 
-    fitness_final = mejor_horario.fitness.values[0]
+    fitness_final = (
+        mejor_horario.fitness.values[0]
+    )
 
 
     # ========================================================
@@ -660,39 +1006,101 @@ def ejecutar_optimizador(datos_front):
 
     horario_limpio = []
 
+
     for gen in mejor_horario:
 
-        horario_limpio.append(
-            {
-                "grupo": gen["grupo"],
-                "materia_codigo": gen.get(
-                    "materia_codigo",
-                    ""
-                ),
-                "materia": gen["materia"],
-                "profesor": gen["profesor"],
-                "dia": gen["dia"],
-                "bloque": gen["bloque"],
-                "espacio": gen["espacio"]
-            }
+        horario_limpio.append({
+
+            "grupo": gen["grupo"],
+
+            "materia_codigo": gen.get(
+                "materia_codigo",
+                ""
+            ),
+
+            "materia": gen["materia"],
+
+            "profesor": gen["profesor"],
+
+            "dia": gen["dia"],
+
+            "bloque": gen["bloque"],
+
+            "espacio": gen["espacio"]
+
+        })
+
+
+    # ========================================================
+    # 19. DIAGNÓSTICO FINAL
+    # ========================================================
+
+    print("\n")
+    print("==============================================")
+    print("       RESULTADO DEL ALGORITMO")
+    print("==============================================")
+
+    print(
+        "Clases generadas:",
+        len(horario_limpio)
+    )
+
+    print(
+        "Fitness final:",
+        fitness_final
+    )
+
+
+    if horario_limpio:
+
+        print("\nPrimeras 5 clases:")
+
+        for clase in horario_limpio[:5]:
+
+            print(
+                "  ",
+                clase
+            )
+
+    else:
+
+        print(
+            "⚠️ EL ALGORITMO NO GENERÓ CLASES."
         )
 
 
+    print(
+        "=============================================="
+    )
+
+
     # ========================================================
-    # 19. RESULTADO FINAL
+    # 20. RESULTADO FINAL
     # ========================================================
 
     return {
-        "mensaje": "Simulación completada con éxito",
 
-        "fitness_final": fitness_final,
+        "mensaje":
+            "Simulación completada con éxito",
+
+        "fitness_final":
+            fitness_final,
 
         "parametros": {
-            "tamano_poblacion": TAMANO_POBLACION,
-            "prob_cruza": PROB_CRUZA,
-            "prob_mutacion": PROB_MUTACION,
-            "generaciones": GENERACIONES
+
+            "tamano_poblacion":
+                TAMANO_POBLACION,
+
+            "prob_cruza":
+                PROB_CRUZA,
+
+            "prob_mutacion":
+                PROB_MUTACION,
+
+            "generaciones":
+                GENERACIONES
         },
 
-        "horario": horario_limpio
+        "horario":
+            horario_limpio
     }

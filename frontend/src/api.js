@@ -19,6 +19,7 @@ export const BLOQUES = [
 export const PARAMETROS = {
   tamano_poblacion: 300,
   generaciones: 500,
+  prob_mutacion: 0.5,
 };
 
 // Catálogo real (grupos, materias, profesores, espacios) leído de Supabase
@@ -49,6 +50,41 @@ export async function crearGrupo(datos) {
 
 export async function crearEspacio(datos) {
   const { data } = await api.post('/api/espacios', datos);
+  return data;
+}
+// ============================================================
+// ELIMINAR / DESACTIVAR
+// ============================================================
+
+export async function eliminarMateria(clave) {
+  const { data } = await api.delete(
+    `/api/materias/${encodeURIComponent(clave)}`
+  );
+
+  return data;
+}
+
+export async function eliminarProfesor(nombre) {
+  const { data } = await api.delete(
+    `/api/profesores/${encodeURIComponent(nombre)}`
+  );
+
+  return data;
+}
+
+export async function eliminarGrupo(nombre) {
+  const { data } = await api.delete(
+    `/api/grupos/${encodeURIComponent(nombre)}`
+  );
+
+  return data;
+}
+
+export async function eliminarEspacio(nombre) {
+  const { data } = await api.delete(
+    `/api/espacios/${encodeURIComponent(nombre)}`
+  );
+
   return data;
 }
 

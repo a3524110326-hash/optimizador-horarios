@@ -18,6 +18,8 @@ import {
 
   X,
 
+  Trash2,
+
 } from 'lucide-react';
 
 
@@ -35,6 +37,11 @@ import {
   crearGrupo,
 
   crearEspacio,
+
+  eliminarMateria,
+  eliminarProfesor,
+  eliminarGrupo,
+  eliminarEspacio,
 
   mensajeDeError,
 
@@ -524,6 +531,23 @@ function MateriasTab({
 
 
 
+  async function eliminarMateriaUI(materia) {
+
+    if (!window.confirm(`¿Eliminar la materia "${materia.nombre}"?`)) return;
+
+    setGuardando(true);
+    setError('');
+
+    try {
+      await eliminarMateria(materia.clave);
+      await onRecargar();
+    } catch (e) {
+      setError(e?.response?.data?.detail || mensajeDeError(e));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   return (
 
     <>
@@ -622,6 +646,12 @@ function MateriasTab({
 
               </th>
 
+              <th className="px-4 py-3 text-sm font-semibold text-gray-600 text-center">
+
+                Acción
+
+              </th>
+
 
 
             </tr>
@@ -648,7 +678,7 @@ function MateriasTab({
 
                 <td
 
-                  colSpan={5}
+                  colSpan={6}
 
                   className="px-4 py-10 text-center text-gray-500"
 
@@ -815,6 +845,18 @@ function MateriasTab({
                 </td>
 
 
+
+                <td className="px-4 py-3 text-center">
+                  <button
+                    type="button"
+                    onClick={() => eliminarMateriaUI(m)}
+                    disabled={guardando}
+                    title="Eliminar materia"
+                    className="inline-flex items-center justify-center p-2 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </td>
 
               </tr>
 
@@ -1552,6 +1594,23 @@ function ProfesoresTab({
 
 
 
+  async function eliminarProfesorUI(nombre) {
+
+    if (!window.confirm(`¿Eliminar al profesor "${nombre}"?`)) return;
+
+    setGuardando(true);
+    setError('');
+
+    try {
+      await eliminarProfesor(nombre);
+      await onRecargar();
+    } catch (e) {
+      setError(e?.response?.data?.detail || mensajeDeError(e));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   return (
 
     <>
@@ -1684,7 +1743,7 @@ function ProfesoresTab({
 
                   key={nombre}
 
-                  className="px-6 py-4 grid grid-cols-1 md:grid-cols-3 gap-3 md:items-center"
+                  className="px-6 py-4 grid grid-cols-1 md:grid-cols-4 gap-3 md:items-center"
 
                 >
 
@@ -1805,6 +1864,18 @@ function ProfesoresTab({
                   </div>
 
 
+
+                  <div className="flex justify-end md:justify-center">
+                    <button
+                      type="button"
+                      onClick={() => eliminarProfesorUI(nombre)}
+                      disabled={guardando}
+                      title="Eliminar profesor"
+                      className="p-2 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                    >
+                      <Trash2 size={17} />
+                    </button>
+                  </div>
 
                 </li>
 
@@ -1970,6 +2041,8 @@ function ListaFija({
 
   onClickBoton,
 
+  onEliminar,
+
   icono,
 
 }) {
@@ -2070,29 +2143,23 @@ function ListaFija({
 
         {items.map((item) => (
 
-
-
           <span
-
             key={item}
-
-            className="bg-slate-100 text-slate-700 rounded-full px-3 py-1 text-sm"
-
+            className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 rounded-full pl-3 pr-1 py-1 text-sm"
           >
-
-
-
             {icono}
-
-
-
             {item.replace(/\_/g, ' ')}
-
-
-
+            {onEliminar && (
+              <button
+                type="button"
+                onClick={() => onEliminar(item)}
+                title={`Eliminar ${item}`}
+                className="ml-1 p-1 rounded-full text-red-500 hover:text-red-700 hover:bg-red-100 transition-colors"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
           </span>
-
-
 
         ))}
 
@@ -2401,6 +2468,33 @@ function EspaciosTab({
 
 
 
+  async function eliminarElemento(item, tipo) {
+
+    const etiqueta = tipo === 'GRUPO'
+      ? 'grupo'
+      : tipo === 'AULA'
+        ? 'aula'
+        : 'laboratorio';
+
+    if (!window.confirm(`¿Eliminar ${etiqueta} "${item}"?`)) return;
+
+    setGuardando(true);
+    setError('');
+
+    try {
+      if (tipo === 'GRUPO') {
+        await eliminarGrupo(item);
+      } else {
+        await eliminarEspacio(item);
+      }
+      await onRecargar();
+    } catch (e) {
+      setError(e?.response?.data?.detail || mensajeDeError(e));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   return (
 
     <>
@@ -2431,6 +2525,10 @@ function EspaciosTab({
 
           }
 
+          onEliminar={(item) =>
+            eliminarElemento(item, 'GRUPO')
+          }
+
         />
 
 
@@ -2453,6 +2551,10 @@ function EspaciosTab({
 
             abrir('AULA')
 
+          }
+
+          onEliminar={(item) =>
+            eliminarElemento(item, 'AULA')
           }
 
           icono={
@@ -2489,6 +2591,10 @@ function EspaciosTab({
 
             abrir('LABORATORIO')
 
+          }
+
+          onEliminar={(item) =>
+            eliminarElemento(item, 'LABORATORIO')
           }
 
           icono={
