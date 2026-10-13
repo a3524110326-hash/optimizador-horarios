@@ -561,126 +561,254 @@ def crear_profesor(datos: dict):
 # ============================================================
 # CREAR MATERIA
 # ============================================================
-
 @app.post("/api/materias")
 def crear_materia(datos: dict):
 
+
     try:
 
-        clave = datos.get(
-            "clave",
-            ""
-        ).strip()
+
+        clave = (datos.get("clave") or "").strip()
+        nombre = (datos.get("nombre") or "").strip()
+        horas_semana = datos.get("horas_semana", 0)
+        requiere_laboratorio = datos.get("requiere_laboratorio", False)
+        cuatrimestre_id = datos.get("cuatrimestre_id")
+        carrera_id = datos.get("carrera_id")
+        profesor_id = datos.get("profesor_id")
 
 
-        nombre = datos.get(
-            "nombre",
-            ""
-        ).strip()
-
-
-        horas_semana = datos.get(
-            "horas_semana",
-            0
-        )
-
-
-        requiere_laboratorio = datos.get(
-            "requiere_laboratorio",
-            False
-        )
-
-
-        cuatrimestre_id = datos.get(
-            "cuatrimestre_id"
-        )
 
 
         if not clave:
 
+
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    "La clave de la materia "
-                    "es obligatoria."
-                )
+                detail="La clave de la materia es obligatoria."
             )
+
+
 
 
         if not nombre:
 
+
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    "El nombre de la materia "
-                    "es obligatorio."
-                )
+                detail="El nombre de la materia es obligatorio."
             )
+
+
 
 
         if not cuatrimestre_id:
 
+
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    "El cuatrimestre "
-                    "es obligatorio."
-                )
+                detail="El cuatrimestre es obligatorio."
             )
 
 
-        resultado = ejecutar_con_reintentos(
+
+
+        # ----------------------------------------------------
+        # CARRERA: si no llega, se toma la del cuatrimestre
+        # ----------------------------------------------------
+
+
+        if not carrera_id:
+
+
+            cuatrimestre = ejecutar_con_reintentos(
+                lambda: supabase.table(
+                    "cuatrimestres"
+                ).select(
+                    "carrera_id"
+                ).eq(
+                    "id",
+                    cuatrimestre_id
+                ).execute()
+            ).data
+
+
+            if not cuatrimestre:
+
+
+                raise HTTPException(
+                    status_code=400,
+                    detail="El cuatrimestre seleccionado no existe."
+                )
+
+
+            carrera_id = cuatrimestre[0]["carrera_id"]
+
+
+
+
+        fila = {
+
+
+            "clave": clave,
+
+
+            "nombre": nombre,
+
+
+            "horas_semana": horas_semana,
+
+
+            "requiere_laboratorio": requiere_laboratorio,
+
+
+            "carrera_id": carrera_id,
+
+
+            "cuatrimestre_id": cuatrimestre_id,
+
+
+            "activo": True
+        }
+
+
+
+
+        # ----------------------------------------------------
+        # ¿YA EXISTE ESA CLAVE?
+        # (eliminar solo desactiva, así que puede estar oculta)
+        # ----------------------------------------------------
+
+
+        existente = ejecutar_con_reintentos(
             lambda: supabase.table(
                 "materias"
-            ).insert({
+            ).select(
+                "id, activo"
+            ).eq(
+                "clave",
+                clave
+            ).execute()
+        ).data
 
-                "clave":
-                    clave,
 
-                "nombre":
-                    nombre,
 
-                "horas_semana":
-                    horas_semana,
 
-                "requiere_laboratorio":
-                    requiere_laboratorio,
+        if existente and existente[0]["activo"]:
 
-                "cuatrimestre_id":
-                    cuatrimestre_id,
 
-                "activo":
-                    True
+            raise HTTPException(
+                status_code=409,
+                detail="Ya existe una materia con esa clave."
+            )
 
-            }).execute()
-        )
+
+
+
+        if existente:
+
+
+            # estaba "eliminada": se reactiva con los datos nuevos
+            resultado = ejecutar_con_reintentos(
+                lambda: supabase.table(
+                    "materias"
+                ).update(
+                    fila
+                ).eq(
+                    "id",
+                    existente[0]["id"]
+                ).execute()
+            )
+
+
+        else:
+
+
+            resultado = ejecutar_con_reintentos(
+                lambda: supabase.table(
+                    "materias"
+                ).insert(
+                    fila
+                ).execute()
+            )
+
+
 
 
         if not resultado.data:
 
+
             raise HTTPException(
                 status_code=500,
-                detail=(
-                    "No se pudo crear la materia."
-                )
+                detail="No se pudo crear la materia."
             )
 
 
-        return resultado.data[0]
+
+
+        materia = resultado.data[0]
+
+
+
+
+        # ----------------------------------------------------
+        # PROFESOR: se guarda en la tabla profesor_materia
+        # ----------------------------------------------------
+
+
+        if profesor_id:
+
+
+            ejecutar_con_reintentos(
+                lambda: supabase.table(
+                    "profesor_materia"
+                ).delete().eq(
+                    "materia_id",
+                    materia["id"]
+                ).execute()
+            )
+
+
+            ejecutar_con_reintentos(
+                lambda: supabase.table(
+                    "profesor_materia"
+                ).insert({
+
+
+                    "profesor_id": profesor_id,
+
+
+                    "materia_id": materia["id"]
+
+
+                }).execute()
+            )
+
+
+
+
+        return materia
+
+
 
 
     except HTTPException:
 
+
         raise
 
 
+
+
     except Exception as e:
+
 
         print(
             "ERROR AL CREAR MATERIA:"
         )
 
+
         print(e)
+
 
         raise HTTPException(
             status_code=500,
